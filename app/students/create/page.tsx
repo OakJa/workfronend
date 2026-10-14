@@ -1,24 +1,54 @@
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { studentSchema } from "../validation";
+import CreateStudentForm from "./create-student-form";
 
-async function createStudent(formData: FormData) {
+type FormState = {
+  success: boolean;
+  errors?: {
+    studentCode?: string[];
+    name?: string[];
+    email?: string[];
+    major?: string[];
+    year?: string[];
+  };
+};
+
+async function createStudent(
+  state: FormState,
+  formData: FormData
+): Promise<FormState> {
   "use server";
 
-  const studentCode = formData.get("studentCode") as string;
-  const name = formData.get("name") as string;
-  const email = formData.get("email") as string;
-  const major = formData.get("major") as string;
-  const year = Number(formData.get("year"));
-
-  await prisma.student.create({
-    data: {
-      studentCode,
-      name,
-      email: email || null,
-      major,
-      year,
-    },
+  const result = studentSchema.safeParse({
+    studentCode: formData.get("studentCode"),
+    name: formData.get("name"),
+    email: formData.get("email"),
+    major: formData.get("major"),
+    year: Number(formData.get("year")),
   });
+
+  if (!result.success) {
+    return {
+      success: false,
+      errors: result.error.flatten().fieldErrors,
+    };
+  }
+
+  try {
+    await prisma.student.create({
+      data: result.data,
+    });
+  } catch {
+    return {
+      success: false,
+      errors: {
+        studentCode: [
+          "รหัสนักศึกษานี้มีอยู่แล้ว",
+        ],
+      },
+    };
+  }
 
   redirect("/students");
 }
@@ -36,118 +66,7 @@ export default function CreateStudentPage() {
         </p>
       </div>
 
-      <form
-        action={createStudent}
-        className="space-y-5 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
-      >
-        <div>
-          <label
-            htmlFor="studentCode"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            รหัสนักศึกษา
-          </label>
-
-          <input
-            id="studentCode"
-            type="text"
-            name="studentCode"
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="name"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            ชื่อ-นามสกุล
-          </label>
-
-          <input
-            id="name"
-            type="text"
-            name="name"
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="email"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            Email
-          </label>
-
-          <input
-            id="email"
-            type="email"
-            name="email"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="major"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            สาขา
-          </label>
-
-          <input
-            id="major"
-            type="text"
-            name="major"
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="year"
-            className="mb-2 block text-sm font-medium text-gray-700"
-          >
-            ชั้นปี
-          </label>
-
-          <input
-            id="year"
-            type="number"
-            name="year"
-            min="1"
-            max="8"
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-          />
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <button
-            type="submit"
-            className="rounded-md bg-blue-600 px-5 py-2 font-medium text-white hover:bg-blue-700"
-          >
-            บันทึก
-          </button>
-
-          <a
-            href="/students"
-            className="rounded-md border border-gray-300 px-5 py-2 font-medium text-gray-700 hover:bg-gray-50"
-          >
-            ยกเลิก
-          </a>
-            <a
-    href={`/students/create`}
-    className="inline-block rounded bg-blue-600 my-5 px-6 py-2.5 text-sm font-medium text-white shadow-md transition duration-150 ease-in-out hover:bg-blue-700 hover:shadow-lg focus:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-  >
-    เพิ่มนักศึกษา
-  </a>
-        </div>
-      </form>
+      <CreateStudentForm action={createStudent} />
     </main>
   );
 }
